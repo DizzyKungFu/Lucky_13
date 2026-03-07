@@ -1,0 +1,544 @@
+@map/first_map "Lucky 13"
+" A TSN fleet has gathered to protect a valuable base from a concerted attack by an alien horde. You must lead the TSN forces!
+## Lucky_13 by Jim Gillispie
+## THIS IS MISSION VERSION: 1.2.8
+##
+## UPDATE HISTORY
+## 1.0.6    initial release
+##
+## 1.1.0    updated to work with Cosmos .exe version 1.1.3 and SBS/MAST libraires version 1.1.0
+##              added better player death checking
+##
+## 1.2.8    updated to work with Cosmos .exe version 1.2.8 (using MAST libraries 1.3.0)
+##          using new version of settings.yaml from Legendary, but tweaked for Lucky_13
+##          had to include new relationships/sides setup
+##
+## Future:  ability to call for reinforcements?
+##          better TSN ship AI? Brains?
+##          Set player heading at start
+
+metadata: ```
+Properties:
+  Main:
+    Player Ships: 'gui_int_slider("$text:int;low: 1.0;high:8.0;", var= "PLAYER_COUNT")'
+    Difficulty: 'gui_int_slider("$text:int;low: 1.0;high:11.0;", var= "DIFFICULTY")'
+  Map:
+    Terrain: 'gui_drop_down("$text: {TERRAIN_SELECT};list: none, few, some, lots, max",var="TERRAIN_SELECT")'
+    Lethal Terrain: 'gui_drop_down("$text: {LETHAL_SELECT};list: none, few, some, lots, max", var="LETHAL_SELECT")'
+    Friendly Ships: 'gui_drop_down("$text: {FRIENDLY_SELECT};list: few, some, lots, max", var="FRIENDLY_SELECT")'
+    Monsters: 'gui_drop_down("$text: {MONSTER_SELECT};list: none, few, some, lots, max", var="MONSTER_SELECT")'
+    Upgrades: 'gui_drop_down("$text: {UPGRADE_SELECT};list: none, few, some, lots, max", var= "UPGRADE_SELECT")'
+    Time Limit: 'gui_input("desc: Minutes;", var="GAME_TIME_LIMIT")'
+```
+
+===== Lucky_13_start ======
+
+    terrain_value = terrain_to_value(TERRAIN_SELECT)
+    lethal_value =  terrain_to_value(LETHAL_SELECT)
+    friendly_value = terrain_to_value(FRIENDLY_SELECT)
+    monster_value = terrain_to_value(MONSTER_SELECT)
+    upgrade_value = terrain_to_value(UPGRADE_SELECT)
+
+    print("DIFFICULTY: ", DIFFICULTY)
+    print("terrain: ", terrain_value)
+    print("lethal: ", lethal_value)
+    print("friendly: ", friendly_value)
+    print("monster: ", monster_value)
+    print("upgrade: ", upgrade_value)
+
+    #CREATE Sides and diplomacy
+    #
+    # These are the side used for LegendaryMissions
+    #
+    # Some examples of different ways to set up a new side.
+
+    #region Spawn TSN side
+    tsn = await prefab_spawn(prefab_side_generic, data={"key":"tsn"}) #Spawn using only the key
+    # Add a display name, description and color programatically
+    side_set_display_name(tsn, "TSN") 
+    side_set_description(tsn, "The Terran Stellar Navy")
+    side_set_icon_color(tsn, "#07F")
+    #endregion
+
+    #region Spawn Raider side
+    # Everything can be set in the prefab data.
+    raider = await prefab_spawn(prefab_side_generic, data={"key":"raider", "name": "Raider", "color": "#F00", "desc":"Hostile Aliens"})
+    #endregion
+
+    #region Spawn Civ side
+    # Some combination of prefab and functions can be nice.
+    civ = await prefab_spawn(prefab_side_generic, data={"key":"civ","name": "Civ"})
+    side_set_description(civ, "Civilians. Protect them from attack.")
+    side_set_icon_color(civ, "white") #NOTE that you can use color names in addition to hexidecimal
+    #endregion
+
+    # Now we set the relationships between the sides.
+    side_set_relations(tsn, raider, sbs.DIPLOMACY.HOSTILE)
+    side_set_relations(raider, civ, sbs.DIPLOMACY.HOSTILE)
+    side_set_relations(civ, tsn, sbs.DIPLOMACY.ALLIED)
+
+    #The colors for diplomatic relations can be set via script.
+    sim.set_diplomacy_color(sbs.DIPLOMACY.HOSTILE,"#F00")
+    sim.set_diplomacy_color(sbs.DIPLOMACY.ALLIED,"#0AA")
+
+    await task_schedule(spawn_players)
+
+    #terrain_spawn_stations(DIFFICULTY, lethal_value)
+    terrain_asteroid_clusters(terrain_value, selectable=True)
+    terrain_spawn_nebula_clusters(terrain_value, selectable=False)
+    terrain_spawn_pickups(upgrade_value)
+    terrain_spawn_monsters(monster_value)
+    terrain_spawn_black_holes(lethal_value)
+
+    ## Set up some static terrain
+    terrain_spawn_asteroid_box(30000, 0, 32500, size_x=40000, size_z=15000, density_scale=3.0, density=3, height=2000, selectable=True)
+    terrain_spawn_asteroid_sphere(13000, 0, 32500, radius=7500, density_scale=2.0, density=2, height=2000, selectable=True)
+    terrain_spawn_asteroid_sphere(67000, 0, 32500, radius=7500, density_scale=2.0, density=2, height=2000, selectable=True)
+    terrain_spawn_nebula_sphere(10000, 0, -32500, radius=12000, density_scale=3.0, density=3, height=3500, cluster_color="red", selectable=False)
+
+    ## Instead of random stations, create specific ones
+    ## Starting industrial station
+    shared station13 = to_object(npc_spawn(40000, -100, -5000, "IB-13", "civ, station", "starbase_industry", "behav_station"))
+    set_face(station13.id, random_terran(civilian=True))
+    ## wrap a minefield around IB-13 (code taken from Walk The Line)
+    if lethal_value > 0:
+        startAngle = random.randrange(150,190)
+        angle = random.randrange(110,160)
+        endAngle = startAngle + angle
+        depth = 1#random.randrange(2,3)
+    #        width = random.randrange(int(angle/6), int(angle/3))
+        width = int(5 * lethal_value)
+        widthArray = [int(angle / 5.0)]
+        inner = random.randrange(1200,1500)
+        cluster_spawn_points = scatter_ring(width, depth, 40000, -100 , -5000, inner, inner, startAngle, endAngle)
+        # Random type, but same for cluster
+        for v2 in cluster_spawn_points:
+            #keep value between -500 and 500??
+    #                v2.y = abs(v2.y) % 500 * (v2.y/abs(v2.y))
+            mine_obj = terrain_spawn( v2.x, v2.y + random.randrange(-300,300), v2.z,None, None, "danger_1a", "behav_mine")
+            mine_obj.blob.set("damage_done", 5)
+            mine_obj.blob.set("blast_radius", 1000)
+            mine_obj.engine_object.blink_state = -5
+
+    ## Also need to create Starbase 6
+    shared station6 = to_object(npc_spawn(25000, 100, 5000, "SB-6", "tsn, station", "starbase_command", "behav_station"))
+    set_face(station6.id, random_terran(civilian=False))
+    ## wrap a minefield around SB-6 (code taken from Walk The Line)
+    if lethal_value > 0:
+        startAngle = random.randrange(110,160)
+        angle = random.randrange(120,180)
+        endAngle = startAngle + angle
+        depth = 1#random.randrange(2,3)
+    #        width = random.randrange(int(angle/6), int(angle/3))
+        width = int(5 * lethal_value)
+        widthArray = [int(angle / 5.0)]
+        inner = random.randrange(1200,1500)
+        cluster_spawn_points = scatter_ring(width, depth, 25000, 100 , 5000, inner, inner, startAngle, endAngle)
+        # Random type, but same for cluster
+        for v2 in cluster_spawn_points:
+            #keep value between -500 and 500??
+    #                v2.y = abs(v2.y) % 500 * (v2.y/abs(v2.y))
+            mine_obj = terrain_spawn( v2.x, v2.y + random.randrange(-300,300), v2.z,None, None, "danger_1a", "behav_mine")
+            mine_obj.blob.set("damage_done", 5)
+            mine_obj.blob.set("blast_radius", 1000)
+            mine_obj.engine_object.blink_state = -5
+
+
+    ## Move player ship(s) close to IB-13
+    player_list = role("__player__")
+    c = 1
+    for p in player_list:
+        shared pickupship = to_object(p)
+        eo = to_engine_object(p)
+        eo.pos.x = 42000 + (c * 400)
+        eo.pos.y = 0
+        eo.pos.z = -4000 - (c * 400)
+        c+=1
+
+
+    ## Rotate the player ship(s) at start of the mission
+    player_list = role("__player__")
+    c = 1
+    for p in player_list:
+        eo = to_engine_object(p)
+        qCurrent = [eo.rot_quat.w, eo.rot_quat.x, eo.rot_quat.y, eo.rot_quat.z]
+        ##axis = [1, 0, 0] #x-axis
+        ##axis = [0, 0, 1] #z-axis
+        axis = [0, 1, 0] #y-axis
+        angle = 270
+        qRotation = create_rotation_quaternion(axis, angle)
+        qNew = quaternion_multiply(qRotation, qCurrent)
+        eo.rot_quat.w = qNew[0]
+        eo.rot_quat.x = qNew[1]
+        eo.rot_quat.y = qNew[2]
+        eo.rot_quat.z = qNew[3]
+        c+=1
+
+
+    ## Create the TSN fleet
+    ## Level 1 "few"
+    if friendly_value >= 1:
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Donnager_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Donnager", "ship_art": "tsn_juggernaut"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Perseus_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Perseus", "ship_art": "tsn_battle_cruiser"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared SunWukong_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Sun Wukong", "ship_art": "tsn_light_cruiser"})
+
+    ## Level 2 "some"
+    if friendly_value >= 2:
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Arjuna_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Arjuna", "ship_art": "tsn_dreadnought"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Tecumseh_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Tecumseh", "ship_art": "tsn_heavy_cruiser"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Maui_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Maui", "ship_art": "tsn_destroyer"})
+
+    ## Level 3 "lots"
+    if friendly_value >= 3:
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Wotan_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Wotan", "ship_art": "tsn_dreadnought"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Gilgamesh_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Gilgamesh", "ship_art": "tsn_battleship"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Ebisu_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Ebisu", "ship_art": "tsn_light_cruiser"})
+
+    ## Level 4 "many/max"
+    if friendly_value >= 4:
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Theseus_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Theseus", "ship_art": "tsn_battle_cruiser"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Beowulf_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Beowulf", "ship_art": "tsn_battleship"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Hwanung_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Hwanung", "ship_art": "tsn_light_cruiser"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Eshu_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Eshu", "ship_art": "tsn_scout"})
+        tsn_start_x = random.randrange(10000,35000)
+        tsn_start_y = random.randrange(-1000,1000)
+        tsn_start_z = random.randrange(-10000,10000)
+        shared Lancelot_id = await prefab_spawn(prefab_npc_defender, {"START_X": tsn_start_x, "START_Y": tsn_start_y, "START_Z": tsn_start_z, "name": "TSN Lancelot", "ship_art": "tsn_destroyer"})
+
+
+    ## Link sensors to the TSN ships and stations (THIS IS THE WAY!)
+    for p in role("__player__"):
+        if p is not None:
+            player_ship_id = to_id(p)
+            link(player_ship_id, "extra_scan_source", role("tsn"))
+
+
+    ## Also link sensors to IB-13
+    for p in role("__player__"):
+        if p is not None:
+            player_ship_id = to_id(p)
+            link(player_ship_id, "extra_scan_source", station13.id)
+
+
+    ## Create the starting bad guys
+    print("Difficulty is set to: ", DIFFICULTY)
+
+    ## Difficulty is at least 1
+    k1a_start_x = random.randrange(-15000,-3000)
+    k1a_start_z = random.randrange(-30000,30000)
+    k1b_start_x = random.randrange(-15000,-3000)
+    k1b_start_z = random.randrange(-30000,30000)
+    s1_start_x = random.randrange(-15000,-3000)
+    s1_start_z = random.randrange(-30000,30000)
+    prefab_spawn(prefab_fleet_raider, {"race": "kralien", "fleet_difficulty": DIFFICULTY, "START_X": k1a_start_x, "START_Y": 0, "START_Z": k1a_start_z})
+    prefab_spawn(prefab_fleet_raider, {"race": "kralien", "fleet_difficulty": DIFFICULTY, "START_X": k1b_start_x, "START_Y": 0, "START_Z": k1b_start_z})
+    prefab_spawn(prefab_fleet_raider, {"race": "skaraan", "fleet_difficulty": DIFFICULTY, "START_X": s1_start_x, "START_Y": 0, "START_Z": s1_start_z})
+
+    ## Difficulty is at least 2
+    if DIFFICULTY >= 2:
+        k2a_start_x = random.randrange(-15000,-3000)
+        k2a_start_z = random.randrange(-30000,30000)
+        k2b_start_x = random.randrange(-15000,-3000)
+        k2b_start_z = random.randrange(-30000,30000)
+        prefab_spawn(prefab_fleet_raider, {"race": "kralien", "fleet_difficulty": DIFFICULTY, "START_X": k2a_start_x, "START_Y": 0, "START_Z": k2a_start_z})
+        prefab_spawn(prefab_fleet_raider, {"race": "kralien", "fleet_difficulty": DIFFICULTY, "START_X": k2b_start_x, "START_Y": 0, "START_Z": k2b_start_z})
+
+    ## Difficulty is at least 3
+    if DIFFICULTY >= 3:
+        k3a_start_x = random.randrange(-15000,-3000)
+        k3a_start_z = random.randrange(-30000,30000)
+        prefab_spawn(prefab_fleet_raider, {"race": "kralien", "fleet_difficulty": DIFFICULTY, "START_X": k3a_start_x, "START_Y": 0, "START_Z": k3a_start_z})
+        s3_location = random.randrange(1,100)
+        if s3_location <= 50:
+            s3_start_x = random.randrange(1,20000)
+            s3_start_z = random.randrange(25000,40000)
+        if s3_location >= 51:
+            s3_start_x = random.randrange(1,20000)
+            s3_start_z = random.randrange(-40000,-25000)
+        prefab_spawn(prefab_fleet_raider, {"race": "skaraan", "fleet_difficulty": DIFFICULTY, "START_X": s3_start_x, "START_Y": 0, "START_Z": s3_start_z})
+
+    ## Difficulty is 4-6
+    if DIFFICULTY >= 4 and DIFFICULTY <= 6:
+        loop_num = DIFFICULTY - 2
+        for x while loop_num > 0:
+            gen_new_species = random.randrange(1,100)
+            print("gen_new_species: ", gen_new_species)
+            if gen_new_species >= 1 and gen_new_species <= 25:
+                new_species = "kralien"
+            if gen_new_species >= 26 and gen_new_species <= 50:
+                new_species = "skaraan"
+            if gen_new_species >= 51 and gen_new_species <= 100:
+                new_species = "torgoth"
+            gen_new_area = random.randrange(1,100)
+            print("gen_new_area: ", gen_new_area)
+            if gen_new_area >= 1 and gen_new_area <= 80:
+                new_pos_x = random.randrange(-15000,-3000)
+                new_pos_z = random.randrange(-30000,30000)
+            if gen_new_area >= 81 and gen_new_area <= 90:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(25000,40000)
+            if gen_new_area >= 91 and gen_new_area <= 100:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(-40000,-25000)
+            prefab_spawn(prefab_fleet_raider, {"race": new_species, "fleet_difficulty": DIFFICULTY, "START_X": new_pos_x, "START_Y": 0, "START_Z": new_pos_z})
+            loop_num = loop_num - 1
+            
+    ## Difficulty is 7-9
+    if DIFFICULTY >= 7 and DIFFICULTY <= 9:
+        loop_num = DIFFICULTY - 2
+        for x while loop_num > 0:
+            gen_new_species = random.randrange(1,100)
+            if gen_new_species >= 1 and gen_new_species <= 25:
+                new_species = "kralien"
+            if gen_new_species >= 26 and gen_new_species <= 50:
+                new_species = "skaraan"
+            if gen_new_species >= 51 and gen_new_species <= 75:
+                new_species = "torgoth"
+            if gen_new_species >= 76 and gen_new_species <= 100:
+                new_species = "arvonian"
+            gen_new_area = random.randrange(1,100)
+            if gen_new_area >= 1 and gen_new_area <= 70:
+                new_pos_x = random.randrange(-15000,-3000)
+                new_pos_z = random.randrange(-30000,30000)
+            if gen_new_area >= 71 and gen_new_area <= 85:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(25000,40000)
+            if gen_new_area >= 86 and gen_new_area <= 100:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(-40000,-25000)
+            prefab_spawn(prefab_fleet_raider, {"race": new_species, "fleet_difficulty": DIFFICULTY, "START_X": new_pos_x, "START_Y": 0, "START_Z": new_pos_z})
+            loop_num = loop_num - 1
+
+    ## Difficulty is 10-11
+    if DIFFICULTY >= 10:
+        loop_num = DIFFICULTY - 1
+        for x while loop_num > 0:
+            gen_new_species = random.randrange(1,100)
+            if gen_new_species >= 1 and gen_new_species <= 10:
+                new_species = "kralien"
+            if gen_new_species >= 11 and gen_new_species <= 20:
+                new_species = "skaraan"
+            if gen_new_species >= 21 and gen_new_species <= 45:
+                new_species = "torgoth"
+            if gen_new_species >= 46 and gen_new_species <= 70:
+                new_species = "arvonian"
+            if gen_new_species >= 71 and gen_new_species <= 100:
+                new_species = "ximni"
+            gen_new_area = random.randrange(1,100)
+            if gen_new_area >= 1 and gen_new_area <= 60:
+                new_pos_x = random.randrange(-15000,-2000)
+                new_pos_z = random.randrange(-30000,30000)
+            if gen_new_area >= 61 and gen_new_area <= 80:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(25000,40000)
+            if gen_new_area >= 81 and gen_new_area <= 100:
+                new_pos_x = random.randrange(1,20000)
+                new_pos_z = random.randrange(-40000,-25000)
+            prefab_spawn(prefab_fleet_raider, {"race": new_species, "fleet_difficulty": DIFFICULTY, "START_X": new_pos_x, "START_Y": 0, "START_Z": new_pos_z})
+            loop_num = loop_num - 1
+
+
+    ## Mission variables
+    CallReceived = 0
+    reminder = 0
+    death_rattle = 0
+
+
+    ## Scheduled tasks
+    await task_schedule(docking_standard_player_station)
+    task_schedule(intro_message)
+    task_schedule(further_info)
+    task_schedule(final_message)
+    task_schedule(ending_triggered)
+
+
+    ## Start the game
+    //signal/game_started 
+    await delay_sim(2)
+    gui_reroute_server(start_screen)
+
+
+    ## Enforce black hole deaths
+    //damage/internal if has_role(DAMAGE_ORIGIN_ID, "__player__") and EVENT.sub_tag == "maelstrom"
+    explode_player_ship(DAMAGE_ORIGIN_ID)
+
+
+    ## This handles when a player ships is destroyed
+    ## The default is to truly delete it
+    //shared/signal/player_ship_destroyed
+    print("story: Exploded Deleting player_ship")
+    yield success if get_shared_inventory_value("GAME_ENDED", False)
+
+    so = to_object(DESTROYED_ID)
+    if so is not None:
+        <all>
+        % {so.name} has perished
+        % {so.name} has blown up
+        % lost contact with {so.name} 
+
+    so = to_object(DESTROYED_ID)
+    if so is not None:
+        sbs.delete_object(DESTROYED_ID)
+
+    await delay_sim(1)
+
+
+====== start_screen ======
+    sbs.suppress_client_connect_dialog(0)
+    gui_section("area:0,0,100,100")
+    gui_layout_widget("3dview")
+    gui_section("area:20,40,80,80")
+    gui_text_area("$t Lucky 13\n\nversion: 1.2.8\nby: Jim Gillispie\n\n", "background:#0006")
+    await gui(timeout=delay_sim(8))
+
+    gui_reroute_server(show_main_game_screen)
+    sbs.suppress_client_connect_dialog(1)
+    ->END
+
+====== intro_message =======
+    await delay_sim(20)
+    
+    if CallReceived == 1:
+        ->END
+
+    if CallReceived == 0:
+        for p in role("__player__"):
+            if p is not None:
+                COMMS_SELECTED_ID = station6
+                COMMS_ORIGIN_ID = p
+                comms_receive(f"""An alien confederacy really wants to wipe out our critical industrial base in this sector, ol' Lucky IB-13! Stop the enemy by whatever means necessary! Fortunately, we've assembled quite a fleet of TSN vessels to assist you, so take command and organize the defense.""", title="ORDERS", title_color="red")
+        CallReceived = 1
+
+    jump intro_message
+
+
+====== further_info =======
+    await delay_sim(300)
+    
+    if not object_exists(station6):
+        ->END
+
+    if reminder == 1:
+        ->END
+
+    if reminder == 0:
+        for p in role("__player__"):
+            if p is not None:
+                COMMS_SELECTED_ID = station6
+                COMMS_ORIGIN_ID = p
+                comms_receive(f"""Who knows what we did to piss off so many different alien societies? Well, the industrial base has survived a lot of close calls in the past, that's why the troops call her 'Lucky 13'! All other assets, including our starbase, are expendible, but IB-13 must survive at all costs!""", title="UPDATE", title_color="red")
+        reminder = 1
+        ->END
+
+    jump further_info
+
+
+====== final_message =======
+    await delay_sim(10)
+    
+    if death_rattle == 1:
+        ->END
+
+    if not object_exists(station6):
+        for p in role("__player__"):
+            if p is not None:
+                COMMS_SELECTED_ID = station6
+                COMMS_ORIGIN_ID = p
+                comms_receive(f"""Carry on without us! Whatever you do, protect IB-13. Good lu.......""", title="FINAL MESSAGE", title_color="red")
+        death_rattle = 1
+        ->END
+
+    jump final_message
+
+
+====== ending_triggered =======
+    await delay_sim(10)
+
+    ## Count the enemies left
+    left = role("raider")
+    c = len(left)
+
+    ## Count the players left
+    playersships = role('__player__')
+
+    ## End if all the player ships are destroyed
+    if len(playersships)==0:
+        START_TEXT = "Mission Failure!  All the player ships have been destroyed!"
+        GAME_STARTED = False
+        GAME_ENDED = True
+        sbs.play_music_file(0, "music/default/failure")
+        signal_emit("show_game_results", None)
+        ->END
+
+    ## End if IB-13 destroyed
+    if not object_exists(station13):
+        remove_role(left, "raider")
+        START_TEXT = "Mission Failure!  Industrial Base 13 was destroyed!"
+        GAME_STARTED = False
+        GAME_ENDED = True
+        sbs.play_music_file(0, "music/default/failure")
+        signal_emit("show_game_results", None)
+        ->END
+
+    ## Time has run out
+    if is_timer_set(SHARED, "time_limit") and is_timer_finished(SHARED, "time_limit"):
+        # End attack
+        remove_role(left, "raider")
+        START_TEXT = "Mission time has run out!"
+        GAME_STARTED = False
+        GAME_ENDED = True
+        sbs.play_music_file(0, "music/default/failure")
+        signal_emit("show_game_results", None)
+        ->END
+
+    ## Victory by eliminating all enemies
+    if c == 0:
+        START_TEXT = "Mission Success!  The enemy forces have all been eliminated!"
+        GAME_STARTED = False
+        GAME_ENDED = True
+        sbs.play_music_file(0, "music/default/victory")
+        signal_emit("show_game_results", None)
+        ->END
+
+    await delay_sim(10)
+    jump ending_triggered
+
