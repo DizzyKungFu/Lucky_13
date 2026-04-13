@@ -12,7 +12,7 @@ from sbs_utils.vec import Vec3
 from sbs_utils.procedural.prefab import prefab_spawn
 
 import math
-
+## Dizzy version = 1.2.8
 NEB_MAX_SIZE = 1500
 NEB_SIZE_LARGE = 1500
 NEB_SIZE_SMALL = 1200
@@ -37,7 +37,6 @@ def terrain_remove_points_near(all_points, test_points, radius):
         if keep:
             ret.append(v)
     return ret
-
 
 
 def terrain_random_point_box(all_points, left, top, front, right, bottom, back, inside=True, count=1):
@@ -234,7 +233,7 @@ def terrain_spawn_civ_stations(DIFFICULTY, lethal_value, x_min=-90_000, x_max=90
             startZ += station_step
         #make the station ----------------------------------
         name = f"DS {index+1}"
-        s_roles = f"tsn, station"
+        s_roles = f"civ, station"
         station_object = npc_spawn(*pos, name, s_roles, stat_type, "behav_station")
         so = to_space_object(station_object)
         if so is not None:
@@ -279,6 +278,7 @@ def terrain_asteroid_clusters(terrain_value, center=None, selectable=True, point
 
         terrain_spawn_asteroid_scatter(cluster_spawn_points, 1000, selectable=selectable)
     return spawn_points
+
 
 def terrain_spawn_asteroid_box(x,y,z, size_x=10000,size_z=None, density_scale=1.0, density=1, height=1000, selectable=True, is_tiled=False):
     """
@@ -342,6 +342,7 @@ def terrain_spawn_asteroid_sphere(x,y,z, radius=10000, density_scale=1.0, densit
     cluster_spawn_points = scatter.sphere(amount,  x, y,z, radius)
     terrain_spawn_asteroid_scatter(cluster_spawn_points, height, selectable=selectable)
 
+
 def terrain_spawn_asteroid_points(x,y,z, points, radius=10000, density_scale=1.0, density=1, height=1000, selectable=True):
     """
     Spawn asteroid clusters within the box. Density is per 1000.
@@ -390,6 +391,7 @@ def terrain_spawn_asteroid_points(x,y,z, points, radius=10000, density_scale=1.0
 
         cluster_spawn_points = scatter.line(amount, x1, y1, z1, x2,y2, z2, True)
         terrain_spawn_asteroid_scatter(cluster_spawn_points, height, selectable=selectable)
+
 
 def terrain_spawn_asteroid_scatter(cluster_spawn_points, height, selectable=True):
     """
@@ -486,8 +488,6 @@ def terrain_spawn_asteroid_scatter(cluster_spawn_points, height, selectable=True
             asteroid.blob.set("local_scale_z_coeff", sz1)
 
 
-
-
 def terrain_to_value(dropdown_select, default=0):
     """
     Convert a string representation of the terrain density (shown to the players) to an integer.
@@ -526,7 +526,7 @@ def terrain_spawn_nebula_clusters(terrain_value, center=None, selectable=False, 
     if center is None:
         center = Vec3(0,0,0)
 
-    from ..helpers import FrameContext
+    from sbs_utils.helpers import FrameContext
     
 
     t_min = terrain_value * 6
@@ -538,11 +538,10 @@ def terrain_spawn_nebula_clusters(terrain_value, center=None, selectable=False, 
     else:
         spawn_points = scatter.box(count, center.x, center.y, center.z, 200_000, 2000, 200_000, centered=True)
     
-    nebs = []
-        
+    sim = FrameContext.sim
+    
     for v in spawn_points:
-        new_nebs = terrain_spawn_nebula_sphere(v.x,v.y, v.z, 10000,terrain_value, cluster_color=None, selectable=selectable, marker=marker, name=name)
-        nebs.extend(new_nebs)
+        terrain_spawn_nebula_sphere(v.x,v.y, v.z, 10000,terrain_value, cluster_color=None, selectable=selectable, marker=marker, name=name)
 
     # Merge Markers
     # Copy the list to avoid conflict when enumerating
@@ -580,8 +579,9 @@ def terrain_spawn_nebula_clusters(terrain_value, center=None, selectable=False, 
                 color += ","+o_color
         m_obj.set_inventory_value("cluster_color", color)
         m_obj.set_inventory_value("cluster_counts", counts)
-        
-    return nebs
+
+    return spawn_points
+
 
 def color_noise(r_min, r_max, g_min,g_max, b_min, b_max, a_min=0xff, a_max=0xff):
     r = random.randrange(r_min,r_max)
@@ -592,6 +592,7 @@ def color_noise(r_min, r_max, g_min,g_max, b_min, b_max, a_min=0xff, a_max=0xff)
         return f"#{r:02x}{g:02x}{b:02x}{a:02x}"
 
     return f"#{r:02x}{g:02x}{b:02x}"
+
 
 _neb_colors = {
     "purple":{
@@ -742,7 +743,6 @@ _neb_colors = {
         "swirl":  random.random() * 10
     }
 
-
 }
 
 
@@ -772,6 +772,7 @@ def terrain_spawn_nebula_scatter(cluster_spawn_points, height, cluster_color=Non
 
     return ret
 
+
 def terrain_nebula_spawn(v2, height, cluster_color, diameter, density, selectable):
     v2.y = random.random() * (height)-(height/2)
 
@@ -783,6 +784,7 @@ def terrain_nebula_spawn(v2, height, cluster_color, diameter, density, selectabl
 
     terrain_setup_nebula(nebula, diameter, density, cluster_color)
     return nebula
+
 
 def terrain_nebula_color(cluster_color):
     if isinstance(cluster_color,str):
@@ -798,6 +800,7 @@ def terrain_nebula_color(cluster_color):
         nc = list(_neb_colors.values())
         cluster_color = random.choice(nc)
     return cluster_color
+
 
 def terrain_spawn_nebula_box(x,y,z, size_x=10000, size_z=None, density_scale=1.0, density= 1, height=1000, cluster_color=None, selectable=False, marker=True, name = ""):
     """
@@ -820,6 +823,7 @@ def terrain_spawn_nebula_box(x,y,z, size_x=10000, size_z=None, density_scale=1.0
     """
     return terrain_spawn_nebula_common(x,y,z, size_x, size_z, None,density_scale, density, height, cluster_color, selectable,marker, name)
 
+
 def terrain_spawn_nebula_sphere(x,y,z, radius=NEB_MAX_SIZE, density_scale=1.0, density=1.0, 
                                 height=1000, cluster_color=None, selectable=False, marker=True, name=""):
     """
@@ -840,6 +844,7 @@ def terrain_spawn_nebula_sphere(x,y,z, radius=NEB_MAX_SIZE, density_scale=1.0, d
         selectable (bool, optional): Should the spawned nebulae be selectable on the 2D radar widgets? Default is False.
     """
     return terrain_spawn_nebula_common(x,y,z, radius, radius, radius,density_scale, density, height, cluster_color, selectable, marker, name)
+
 
 def terrain_spawn_nebula_common(x,y,z, size_x=10000, size_z=None, 
                                 radius=None,density_scale=1.0, 
@@ -873,8 +878,7 @@ def terrain_spawn_nebula_common(x,y,z, size_x=10000, size_z=None,
     color_is_set = cluster_color is not None
     cluster_color = terrain_nebula_color(cluster_color)
 
-    color = "purple"
-    rainbow = False
+
     if isinstance(cluster_color, dict):
         color = cluster_color.get("display_text", "rainbow")
         rainbow = False
@@ -889,7 +893,6 @@ def terrain_spawn_nebula_common(x,y,z, size_x=10000, size_z=None,
         marker_obj.data_set.set("radar_color_override", "gold" ,0)
         marker_obj.py_object.set_inventory_value("cluster_color", color)
         
-
 
     # Remember Radius is the diameter of the rect
     # Nebula need lots of drift to look good
@@ -907,6 +910,7 @@ def terrain_spawn_nebula_common(x,y,z, size_x=10000, size_z=None,
     #l = len(ret)
     #print(f"cluster count {l}")
     return ret
+
 
 def terrain_setup_nebula(nebula, diameter=4000, density_coef=1.0, color="yellow"):
     """
@@ -949,8 +953,6 @@ def terrain_setup_nebula(nebula, diameter=4000, density_coef=1.0, color="yellow"
     blob.set("nebula_data_change", 1)
 
 
-
-
 def terrain_spawn_monsters(monster_value, center=None, points=None):
     """
     Spawn monsters based on the monster value of the game.
@@ -968,7 +970,7 @@ def terrain_spawn_monsters(monster_value, center=None, points=None):
         except Exception:
             return
     else:
-        spawn_points = scatter.box(monster_value, center.x,center.y, center.z, 180_000, 1500, 180_000, centered=True)
+        spawn_points = scatter.box(monster_value, center.x,center.y, center.z, 180_000, 1000, 180_000, centered=True)
 
     for v in spawn_points:
         prefab_spawn("prefab_typhon_classic", None, *v.xyz)
