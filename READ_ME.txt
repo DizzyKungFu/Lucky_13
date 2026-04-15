@@ -13,4 +13,3 @@
 ##
 ## Future:  ability to call for reinforcements?
 ##          better TSN ship AI? Brains?
-##          Set player heading at start
