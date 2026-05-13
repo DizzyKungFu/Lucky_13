@@ -1,7 +1,7 @@
 @map/first_map "Lucky 13"
 " A TSN fleet has gathered to protect a valuable base from a concerted attack by an alien horde. You must lead the TSN forces!
 ## Lucky_13 by Jim Gillispie
-## THIS IS MISSION VERSION: 1.2.8
+## THIS IS MISSION VERSION: 1.3.0
 ##
 ## UPDATE HISTORY
 ## 1.0.6    initial release
@@ -12,6 +12,10 @@
 ## 1.2.8    updated to work with Cosmos .exe version 1.2.8 (using MAST libraries 1.3.0)
 ##          using new version of settings.yaml from Legendary, but tweaked for Lucky_13
 ##          had to include new relationships/sides setup
+##
+## 1.3.0    updated to work with Cosmos .exe version 1.3.0 (using MAST libraries 1.3.0)
+##          added a description.yaml file, which is new to this version of the game
+##          updated terrain_DOUBLE.py to match latest MAST libraries update
 ##
 ## Future:  ability to call for reinforcements?
 ##          better TSN ship AI? Brains?
@@ -427,7 +431,7 @@ Properties:
     gui_section("area:0,0,100,100")
     gui_layout_widget("3dview")
     gui_section("area:20,40,80,80")
-    gui_text_area("$t Lucky 13\n\nversion: 1.2.8\nby: Jim Gillispie\n\n", "background:#0006")
+    gui_text_area("$t Lucky 13\n\nby: Jim Gillispie\n\n", "background:#0006")
     await gui(timeout=delay_sim(8))
 
     gui_reroute_server(show_main_game_screen)

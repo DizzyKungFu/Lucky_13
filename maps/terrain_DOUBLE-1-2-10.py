@@ -950,6 +950,7 @@ def terrain_setup_nebula(nebula, diameter=4000, density_coef=1.0, color="yellow"
 
 
 
+
 def terrain_spawn_monsters(monster_value, center=None, points=None):
     """
     Spawn monsters based on the monster value of the game.
