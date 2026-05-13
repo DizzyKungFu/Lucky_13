@@ -1,0 +1,8 @@
+#Every mission should have this file included.  It describes the mission for the mission list screen of the server.
+format version: 1
+
+Category: Standard  # category for the mission; used for sorting and filtering the mission list
+Category Priority: A  # letter grade for the category; A grade categories appear at the top of the list
+Visible Mission Name: Lucky 13  # name of the mission as it appears in the mission list
+Description: A huge rumble between the TSN fleet and copious aliens!
+Keywords: fleet battles, Comms heavy, random setup
